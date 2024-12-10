@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import mysql.connector
 import dash_bootstrap_components as dbc
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from estilos import criar_cabecalho, criar_cartao, layout_com_fundo
 
 # Conexão com o banco de dados
@@ -42,17 +42,35 @@ def carregar_dados_gerais():
 
     # Carregar dados de medicamentos por estoque
     cursor.execute("""
-        SELECT nome_medicamento, estoque AS quantidade_estoque
+        SELECT nome_medicamento, estoque AS quantidade_estoque, data_validade
         FROM medicamentos
     """)
     medicamentos_dados = cursor.fetchall()
 
+    # Medicamentos com validade próxima (30 dias)
+    hoje = datetime.now().date()  # Ajuste para .date() para obter apenas a data
+    limite_validade = hoje + timedelta(days=30)
+
+    # Verifique se 'data_validade' não é None ou NULL antes de comparar
+    medicamentos_a_vencer = [
+        med for med in medicamentos_dados 
+        if med["data_validade"] and isinstance(med["data_validade"], (datetime, date)) and med["data_validade"] <= limite_validade
+    ]
     # Carregar lista de locais de entrega
     cursor.execute("SELECT DISTINCT local_entrega FROM entregas")
     locais_entrega = [row["local_entrega"] for row in cursor.fetchall()]
 
     conexao.close()
-    return total_usuarios, total_estoque, total_entregas, total_pendentes, entregas_status, medicamentos_dados, locais_entrega
+    return (
+        total_usuarios,
+        total_estoque,
+        total_entregas,
+        total_pendentes,
+        entregas_status,
+        medicamentos_dados,
+        medicamentos_a_vencer,
+        locais_entrega
+    )
 
 # Função para carregar usuários
 def carregar_usuarios():
@@ -91,7 +109,16 @@ def carregar_dados_usuario(id_usuario):
 
 # Dados gerais e usuários
 usuarios = carregar_usuarios()
-total_usuarios, total_estoque, total_entregas, total_pendentes, entregas_status, medicamentos_dados, locais_entrega = carregar_dados_gerais()
+(
+    total_usuarios, 
+    total_estoque, 
+    total_entregas, 
+    total_pendentes, 
+    entregas_status, 
+    medicamentos_dados, 
+    medicamentos_a_vencer, 
+    locais_entrega
+) = carregar_dados_gerais()
 
 # App Dash
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -162,10 +189,24 @@ app.layout = layout_com_fundo(
                         pd.DataFrame(medicamentos_dados),
                         x="nome_medicamento",
                         y="quantidade_estoque",
-                        title="Estoque de Medicamentos",
+                        color=pd.DataFrame(medicamentos_dados)["nome_medicamento"].isin(
+                            [med["nome_medicamento"] for med in medicamentos_a_vencer]
+                        ).map({True: "Próximo do Vencimento", False: "OK"}),
+                        title="Estoque de Medicamentos (Com Validade Próxima)",
                         labels={"quantidade_estoque": "Quantidade em Estoque"}
                     )
                 ), width=4),
+            ]),
+
+            # Lista de medicamentos prestes a vencer
+            dbc.Row([
+                dbc.Col(html.Div([
+                    html.H5("Medicamentos Prestes a Vencer", className="text-center"),
+                    html.Ul([
+                        html.Li(f"{med['nome_medicamento']} - Validade: {med['data_validade']}")
+                        for med in medicamentos_a_vencer
+                    ])
+                ], className="p-3 bg-light border rounded shadow-sm"), width=12),
             ]),
 
             # Seção de informações do usuário
@@ -262,7 +303,6 @@ def exibir_informacoes_usuario(id_usuario):
     )
 
     return info_usuario, tabela_entregas
-
 
 if __name__ == "__main__":
     app.run_server(debug=True)
