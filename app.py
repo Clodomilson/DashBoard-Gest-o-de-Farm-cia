@@ -2,24 +2,28 @@ import dash
 from dash import dcc, html, Input, Output
 import pandas as pd
 import plotly.express as px
-import mysql.connector
+import pymysql
 import dash_bootstrap_components as dbc
 from datetime import datetime, date, timedelta
 from estilos import criar_cabecalho, criar_cartao, layout_com_fundo
 
-# Conexão com o banco de dados
+# Configurando pymysql como substituto para MySQLdb
+pymysql.install_as_MySQLdb()
+
+# Função para conectar ao banco de dados
 def conectar_banco():
-    return mysql.connector.connect(
+    return pymysql.connect(
         host="localhost",
         user="root",
         password="",
-        database="farmacia_publica"
+        database="farmacia_publica",
+        cursorclass=pymysql.cursors.DictCursor
     )
 
 # Função para carregar dados gerais
 def carregar_dados_gerais():
     conexao = conectar_banco()
-    cursor = conexao.cursor(dictionary=True)
+    cursor = conexao.cursor()
 
     cursor.execute("SELECT COUNT(*) AS total_usuarios FROM usuarios")
     total_usuarios = cursor.fetchone()["total_usuarios"]
@@ -75,7 +79,7 @@ def carregar_dados_gerais():
 # Função para carregar usuários
 def carregar_usuarios():
     conexao = conectar_banco()
-    cursor = conexao.cursor(dictionary=True)
+    cursor = conexao.cursor()
     cursor.execute("SELECT id_usuario, nome FROM usuarios")
     usuarios = cursor.fetchall()
     conexao.close()
@@ -84,7 +88,7 @@ def carregar_usuarios():
 # Função para carregar dados de um usuário específico
 def carregar_dados_usuario(id_usuario):
     conexao = conectar_banco()
-    cursor = conexao.cursor(dictionary=True)
+    cursor = conexao.cursor()
 
     # Dados do usuário
     cursor.execute("SELECT * FROM usuarios WHERE id_usuario = %s", (id_usuario,))
@@ -231,7 +235,7 @@ app.layout = layout_com_fundo(
 )
 def atualizar_grafico_central(local_selecionado):
     conexao = conectar_banco()
-    cursor = conexao.cursor(dictionary=True)
+    cursor = conexao.cursor()
 
     if local_selecionado:
         cursor.execute("""
