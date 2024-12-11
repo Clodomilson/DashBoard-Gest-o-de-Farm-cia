@@ -165,7 +165,13 @@ app.layout = layout_com_fundo(
                         pd.DataFrame(entregas_status),
                         names="status",
                         values="quantidade",
-                        title="Status de Entregas"
+                        title="Status de Entregas",
+                        color="status",
+                        color_discrete_map={
+                            "entregue": "#636efa",  # Azul para entregues
+                            "pendente": "#ef553b"  # Vermelho para pendentes
+
+                        }
                     )
                 ), width=4),
 
@@ -246,12 +252,19 @@ def atualizar_grafico_central(local_selecionado):
         {"Status": "Pendentes", "Quantidade": dados_local["pendentes"]}
     ])
 
+    cores_personalizadas ={
+        "Entregues": "#636efa",
+        "Pendentes": "#ef553b"
+    }
+
     fig = px.bar(
         df_local,
         x="Status",
         y="Quantidade",
         title=f"Entregas no Local: {local_selecionado}" if local_selecionado else "Selecione um local de entrega",
-        labels={"Quantidade": "Quantidade"}
+        labels={"Quantidade": "Quantidade"},
+        color="Status",
+        color_discrete_map=cores_personalizadas
     )
     return fig
 
